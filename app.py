@@ -2,13 +2,12 @@ import streamlit as st
 import os
 import zipfile
 import tempfile
-import convertapi
-
-convertapi.api_secret = 'your_api_secret_here'  # Get from https://www.convertapi.com/a/demo
+import subprocess
+from pdf2image import convert_from_path
 
 st.set_page_config(page_title="Visio to JPG Converter", layout="centered")
-st.title("📐 Visio to JPG Converter")
-st.markdown("Upload `.vsdx` or `.vsdm` files and download a ZIP of high-quality `.jpg` sketches.")
+st.title("📐 Visio to JPG Converter (LibreOffice)")
+st.markdown("Upload `.vsdx` or `.vsdm` files. We'll convert them to high-quality `.jpg` images and zip them for download.")
 
 uploaded_files = st.file_uploader("Upload Visio files", type=["vsdx", "vsdm"], accept_multiple_files=True)
 
@@ -18,14 +17,25 @@ if uploaded_files:
         os.makedirs(output_dir, exist_ok=True)
 
         for file in uploaded_files:
-            file_path = os.path.join(temp_dir, file.name)
-            with open(file_path, "wb") as f:
+            visio_path = os.path.join(temp_dir, file.name)
+            with open(visio_path, "wb") as f:
                 f.write(file.getbuffer())
 
-            result = convertapi.convert('jpg', {'File': file_path})
-            for i, file_info in enumerate(result.files):
-                file_info.save_file(os.path.join(output_dir, f"{os.path.splitext(file.name)[0]}_page{i+1}.jpg"))
+            # Convert to PDF using LibreOffice
+            subprocess.run([
+                "soffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, visio_path
+            ], check=True)
 
+            pdf_name = os.path.splitext(file.name)[0] + ".pdf"
+            pdf_path = os.path.join(temp_dir, pdf_name)
+
+            # Convert PDF to JPG
+            images = convert_from_path(pdf_path, dpi=300)
+            for i, img in enumerate(images):
+                img_path = os.path.join(output_dir, f"{os.path.splitext(file.name)[0]}_page{i+1}.jpg")
+                img.save(img_path, "JPEG")
+
+        # Zip the output
         zip_path = os.path.join(temp_dir, "sketches.zip")
         with zipfile.ZipFile(zip_path, "w") as zipf:
             for root, _, files in os.walk(output_dir):
