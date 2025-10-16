@@ -2,7 +2,9 @@ import streamlit as st
 import os
 import zipfile
 import tempfile
-from aspose.diagram import Diagram, ImageSaveOptions, SaveFileFormat
+import convertapi
+
+convertapi.api_secret = 'your_api_secret_here'  # Get from https://www.convertapi.com/a/demo
 
 st.set_page_config(page_title="Visio to JPG Converter", layout="centered")
 st.title("📐 Visio to JPG Converter")
@@ -20,15 +22,9 @@ if uploaded_files:
             with open(file_path, "wb") as f:
                 f.write(file.getbuffer())
 
-            diagram = Diagram(file_path)
-            options = ImageSaveOptions(SaveFileFormat.JPEG)
-            options.jpeg_quality = 100  # Ensure 100% quality
-
-            for i in range(diagram.pages.count):
-                page = diagram.pages.get_page(i)
-                image_name = f"{os.path.splitext(file.name)[0]}_page{i+1}.jpg"
-                image_path = os.path.join(output_dir, image_name)
-                diagram.save(image_path, options)
+            result = convertapi.convert('jpg', {'File': file_path})
+            for i, file_info in enumerate(result.files):
+                file_info.save_file(os.path.join(output_dir, f"{os.path.splitext(file.name)[0]}_page{i+1}.jpg"))
 
         zip_path = os.path.join(temp_dir, "sketches.zip")
         with zipfile.ZipFile(zip_path, "w") as zipf:
